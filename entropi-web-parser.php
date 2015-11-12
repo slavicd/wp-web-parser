@@ -1,7 +1,7 @@
 <?php
 /**
 * @package Entropi_WebParser
-* @version 1
+* @version 0.1
 */
 /*
 Plugin Name: Entropi Web Parser for Wordpress
