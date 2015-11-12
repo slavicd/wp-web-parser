@@ -65,6 +65,9 @@ class Entropi_WebParser
         // remove post meta
     }
 
+    /**
+     * Performs synchronization for all registered parsers.
+     */
     public static function run()
     {
         $logHandle = fopen(realpath(ABSPATH . '../log') . '/parse.log', 'a');
@@ -94,11 +97,11 @@ class Entropi_WebParser
      * + content: wp content
      * + service: a string identifying the parser (e.g. dummy, or 3d-prints.com)
      * + source: the URL of the
-     * - image: a string holding a binary image representing the main post image
+     * - image: a string holding a binary file representing the main post image
      *
      * @param $parsedPost
      */
-    public static function processParsedPost($parsedPost)
+    private static function processParsedPost($parsedPost)
     {
         $logHandle = fopen(realpath(ABSPATH . '../log') . '/parse.log', 'a');
         fwrite($logHandle, date('r') . ": Synchronizing \n");
@@ -107,10 +110,11 @@ class Entropi_WebParser
         $query = new WP_Query(array(
             'meta_query' => array(
                 array('key' => self::PREFIX . '_service', 'value' => $parsedPost->service),
-                array('key' => self::PREFIX . '_foreign_key', 'value' => $parsedPost->id),
+                array('key' => self::PREFIX . '_foreign_key', 'value' => $parsedPost->foreign_key),
             )
         ));
         if ($query->have_posts()) {
+            // this post is already in the db
             $query->the_post();
             $postId = $query->post->ID;
             fwrite($logHandle, date('r') . ":\t updating post: {$postId}\n");
@@ -120,9 +124,15 @@ class Entropi_WebParser
                 'post_content' => $parsedPost->content,
             ];
             wp_update_post($postData);
-            //update_post_meta($postId, self::PREFIX . '_service', $parsedPost->service);
             update_post_meta($postId, self::PREFIX . '_last_sync', time());
+            update_post_meta($postId, 'source', $parsedPost->source);
+
+            // deal with attachments
+            if (isset($parsedPost->image)) {
+                self::processImage($postId, $parsedPost);
+            }
         } else {
+            // this post looks to be new
             fwrite($logHandle, date('r') . ":\t inserting new post\n");
             $postData = [
                 'post_content' => $parsedPost->content,
@@ -132,11 +142,79 @@ class Entropi_WebParser
             ];
             if ($postId = wp_insert_post($postData)) {
                 add_post_meta($postId, self::PREFIX . '_service', $parsedPost->service);
-                add_post_meta($postId, self::PREFIX . '_foreign_key', $parsedPost->id);
+                add_post_meta($postId, self::PREFIX . '_foreign_key', $parsedPost->foreign_key);
                 add_post_meta($postId, self::PREFIX . '_last_sync', time());
+                add_post_meta($postId, 'source', $parsedPost->source);
             }
         }
 
         fclose($logHandle);
+    }
+
+    /**
+     * @param int $id post id
+     * @param stdClass $post parsed post data
+     */
+    private static function processImage($id, $post)
+    {
+        $wpUploadDir = wp_upload_dir();
+        $upDir = $wpUploadDir['path'];
+
+        $extension = self::detectExtension($post->image);
+        $fileName = $post->service . '-' . $id . '.' . $extension;
+        $fullFileName = $upDir . DIRECTORY_SEPARATOR . $fileName;
+        $fileHandle = fopen($fullFileName, 'w');
+        fwrite($fileHandle, $post->image);
+        fclose($fileHandle);
+
+        $fileType = wp_check_filetype( $fileName , null );  // some duplicate work, i know...
+
+        // Prepare an array of post data for the attachment.
+        $attachment = array(
+            'guid'           => $wpUploadDir['url'] . '/' .  $fileName ,
+            'post_mime_type' => $fileType['type'],
+            'post_title'     => preg_replace( '/\.[^.]+$/', '', $fileName),
+            'post_content'   => '',
+            'post_status'    => 'inherit'
+        );
+
+        $attachId = wp_insert_attachment($attachment, $fullFileName, $id);
+
+        // Make sure that this file is included, as wp_generate_attachment_metadata() depends on it.
+        require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+        // Generate the metadata for the attachment, and update the database record.
+        $attachData = wp_generate_attachment_metadata($attachId, $fullFileName);
+        wp_update_attachment_metadata($attachId, $attachData);
+
+        set_post_thumbnail($id, $attachId);
+    }
+
+    /**
+     * Detects extension based on the mime type of a string
+     * @param string $file
+     * @return string
+     * @throws Exception
+     */
+    private static function detectExtension($file)
+    {
+        $finfo = new finfo(FILEINFO_MIME);
+        $mime = strtok($finfo->buffer($file),';');
+
+        $logHandle = fopen(realpath(ABSPATH . '../log') . '/parse.log', 'a');
+        fwrite($logHandle, date('r') . ":\t detected mime type: {$mime} \n");
+        fclose($logHandle);
+
+        $types = [
+            'image/jpeg' => 'jpg',
+            'image/jpg' => 'jpg',
+            'image/png' => 'png',
+        ];
+
+        if (!isset($types[$mime])) {
+            throw new Exception('Could not detect extension from mime type.');
+        }
+
+        return $types[$mime];
     }
 }

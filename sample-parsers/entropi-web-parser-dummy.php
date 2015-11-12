@@ -68,15 +68,17 @@ class Entropi_WebParser_Dummy
         $posts = [
             (object) [
                 'service' => self::SERVICE,
-                'id' => 0,
+                'foreign_key' => 0,
                 'title' => 'Dummy post #0 RHCP',
                 'content' => 'No it wont be long',
+                'source' => 'http://example.com',
             ],
             (object) [
                 'service' => self::SERVICE,
-                'id' => 1,
+                'foreign_key' => 1,
                 'title' => 'Dummy post #1, Blood Sugar Sex Magik',
                 'content' => "Please don't turn away. Please don't turn me in, to them.",
+                'source' => 'http://example.com',
             ],
         ];
 
