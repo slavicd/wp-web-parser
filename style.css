@@ -1,0 +1,50 @@
+.source-list {
+    width: 300px;
+    float: left;
+    margin-right: 10px;
+}
+
+.source-list .active {
+    font-weight: bold;
+}
+
+.source-list ul {
+    list-style: circle;
+    padding-left: 20px;
+}
+
+.source-list a {
+    text-decoration: none;
+}
+
+.settings {
+    float: left;
+}
+
+.settings label {
+    float: left;
+    width: 200px;
+    text-align: right;
+    padding-right: 10px;
+    padding-top: 5px;
+}
+
+.settings select, .settings input {
+    width: 160px;
+}
+
+.log-section {
+    float: left;
+    padding-left: 40px;
+}
+
+.log-section ul {
+    background-color: #0e3950;
+    color: #00b9eb;
+    padding: 10px;
+    border-radius: 10px;
+}
+
+.log-section form {
+    overflow: hidden;
+}
