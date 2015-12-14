@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Entropi Web Parser for Wordpress: Dummy Source
+Plugin Name: Entropi Web Parser: Dummy Source
 Description: This plugin is for testing the Web Parser
 Author: Slavic Dragovtev <slavic@entropi.me>
 Version: 0.1
@@ -18,13 +18,14 @@ class Entropi_WebParser_Dummy
 {
     const PREFIX = 'entropi_wparser';
     const SERVICE = 'dummy';
+    const NAME = 'Dummy Parser';
 
     private static $instance;
 
     private function __construct()
     {
         // this will be the hook for the main plugin to call
-        add_action(self::PREFIX . '_dummy_synchronize', array('Entropi_WebParser_Dummy', 'synchronize'));
+        add_action(self::PREFIX . '_' . self::SERVICE . '_synchronize', array(__CLASS__, 'synchronize'));
     }
 
     public static function init()
@@ -41,7 +42,12 @@ class Entropi_WebParser_Dummy
     {
         // add sources option
         $sources = get_option(self::PREFIX . '_sources');
-        $sources[self::SERVICE] = array();
+        if ($sources===false) {
+            throw new Exception('This plugin should only be installed after Entropi Web Parser for Wordpress');
+        }
+        $sources[self::SERVICE] = array(
+            'name' => self::NAME
+        );
         update_option(self::PREFIX . '_sources', $sources);
     }
 
@@ -50,6 +56,8 @@ class Entropi_WebParser_Dummy
         $sources = get_option(self::PREFIX . '_sources');
         unset($sources[self::SERVICE]);
         update_option(self::PREFIX . '_sources', $sources);
+
+        wp_clear_scheduled_hook(self::PREFIX . '_parse', array(self::SERVICE));
     }
 
     public static function onUninstall()
@@ -69,7 +77,7 @@ class Entropi_WebParser_Dummy
             (object) [
                 'service' => self::SERVICE,
                 'foreign_key' => 0,
-                'title' => 'Dummy post #0 RHCP',
+                'title' => 'Dummy post #0',
                 'content' => 'No it wont be long',
                 'source' => 'http://example.com',
             ],
@@ -80,10 +88,28 @@ class Entropi_WebParser_Dummy
                 'content' => "Please don't turn away. Please don't turn me in, to them.",
                 'source' => 'http://example.com',
             ],
+            (object) [
+                'service' => self::SERVICE,
+                'foreign_key' => 2,
+                'title' => 'Sample Post',
+                'content' => "Sample post description",
+                'image' => file_get_contents('/home/slavic/Downloads/MailChimp_Logo_NoBackground_Dark.png'),
+                'source' => 'http://example.com',
+            ],
         ];
+
+        $posts = [];
 
         while (list($key, $postInput) = each($posts)) {
             call_user_func($processor, $postInput);
+        }
+        foreach (range(0,9) as $op) {
+            wp_cache_delete('alloptions', 'options');
+            $parsers = get_option(self::PREFIX . '_sources');
+            if (isset($parsers[self::SERVICE]['stop_please'])) {
+                break;
+            }
+            sleep(4);
         }
     }
 }
